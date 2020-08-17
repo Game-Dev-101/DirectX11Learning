@@ -1,52 +1,84 @@
-#include <Windows.h>
+//include windows header file.
+#include<Windows.h>
+#include<windowsx.h>
 
-int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE prevInstance, LPWSTR cmdLine, int cmdShow)
+//Window process prototype.
+LRESULT CALLBACK WindowProc(HWND hWnd,
+							UINT message,
+							WPARAM wParam,
+							LPARAM lParam)
 {
-	UNREFERENCED_PARAMETER(prevInstance);
-	UNREFERENCED_PARAMETER(cmdLine);
-
-	WNDCLASSEX wndClass = { 0 };
-	wndClass.cbSize = sizeof(WNDCLASSEX);
-	wndClass.style = CS_HREDRAW | CS_VREDRAW;
-	wndClass.lpfnWndProc = DefWindowProc;
-	wndClass.hInstance = hInstance;
-	wndClass.hCursor = LoadCursor(NULL, IDC_ARROW);
-	wndClass.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-	wndClass.lpszMenuName = NULL;
-	wndClass.lpszClassName = L"Belajar Direct X 11";
-
-	if (!RegisterClassEx(&wndClass))
+	//Check message nya berisi apa. Bila sudah di destroy maka kita return
+	//Bahwa program keluar dengan sempurna 0.
+	switch (message)
 	{
-		OutputDebugStringW(L"Error RegisterClassEx NULL");
-		return -1;
-	}
-	
-	RECT rc = { 0, 0, 640, 480 };	
-	AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);	
-	HWND hwnd = CreateWindowA("Belajar Direct X 11", "Belajar Direct X 11",
-		WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.
-		left,
-		rc.bottom - rc.top, NULL, NULL, hInstance, NULL);
-	
-	if (!hwnd)
-	{
-		OutputDebugStringW(L"Error hwnd NULL");
-		return -1;
+		case WM_DESTROY:
+			{
+				PostQuitMessage(0);
+				return 0;
+			}
+		break;
 	}
 
-	ShowWindow(hwnd, cmdShow);
-	// Demo Initialize
-	MSG msg = { 0 };
-	while (msg.message != WM_QUIT)
-	{
-		if (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
-		{
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		}
-		// Update
-		// Draw
-	}
-	// Demo Shutdown
-	return static_cast<int>(msg.wParam);
+	//Pastikan tidak ada value yang terlewat.
+	//Dengan DefWindowProc, kita bisa menetralisir semua value yang
+	//terlewat dan diassign dengan 0.
+	return DefWindowProc(hWnd, message, wParam, lParam);
 }
+
+// Entry point punya semua windows program.
+int WINAPI WinMain( HINSTANCE hInstance,
+					HINSTANCE prevInstance,
+					LPSTR cmdLine,
+					int cmdShow)
+{
+	//Handle milik window, diisi dengan function.
+	HWND hWnd;
+
+	//struct yang menyimpan informasi tentang window class.
+	WNDCLASSEX wc;
+
+	//clear memory yang dipakai window class.
+	ZeroMemory(&wc, sizeof(WNDCLASSEX));
+
+	//Isi informasi window class.
+	wc.cbSize = sizeof(WNDCLASSEX); //Size dari window class.
+	wc.style = CS_HREDRAW | CS_VREDRAW; //Style dari window. berfungsi untuk menggambar ulang.
+	wc.lpfnWndProc = WindowProc; //Mendapatkan informasi dari process window.
+	wc.hInstance = hInstance; //Dapatkan instance dari window.
+	wc.hCursor = LoadCursor(NULL, IDC_ARROW); //Cursor yang akan di render di dalam window.
+	wc.hbrBackground = (HBRUSH)COLOR_WINDOW; //Gambar yang akan di 'brush' bila window digerakkan.
+	wc.lpszClassName = L"BelajarDirectX11"; //Class name dari window class.
+
+	//Register window class.
+	RegisterClassEx(&wc);
+
+	//Buat windows Extended.
+	hWnd = CreateWindowEx(NULL,
+		L"BelajarDirectX11",
+		L"Direct X 11 Learn",
+		WS_OVERLAPPEDWINDOW,
+		300,
+		300,
+		500,
+		300,
+		NULL,
+		NULL,
+		hInstance,
+		NULL);
+
+	//Tampilkan window.
+	ShowWindow(hWnd, cmdShow);
+
+	//Object pesan / MSG
+	MSG msg;
+
+	while (GetMessage(&msg, NULL, 0, 0))
+	{
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+	}
+
+	return msg.wParam;
+}
+
