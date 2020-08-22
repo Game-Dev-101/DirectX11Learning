@@ -1,8 +1,24 @@
 //include windows header file.
 #include<Windows.h>
 #include<windowsx.h>
+#include <d3d11.h>
+#include <d3dx11.h>
+#include <d3dx10.h>
 
-//Window process prototype.
+//include Direct3D Library file.
+#pragma comment (lib, "d3d11.lib")
+#pragma comment (lib, "d3dx11.lib")
+#pragma comment (lib, "d3dx10.lib")
+
+IDXGISwapChain* swapChain;			//pointer untuk swap chain interface
+ID3D11Device* dev;					//pointer ke arah Direct3D device interface
+ID3D11DeviceContext* devcon;		//pointer ke arah Direct3D device context
+
+//function prototype
+void InitD3D(HWND hWnd);				//setting initialisasi dari direct3D
+void CleanD3D(void);				//tutup Direct3D dan bersihin memory
+
+//Ini adalah main handler untuk programnya.
 LRESULT CALLBACK WindowProc(HWND hWnd,
 							UINT message,
 							WPARAM wParam,
@@ -53,15 +69,18 @@ int WINAPI WinMain( HINSTANCE hInstance,
 	//Register window class.
 	RegisterClassEx(&wc);
 
+	RECT wr = { 0,0,500,400 };
+	AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
+
 	//Buat windows Extended.
 	hWnd = CreateWindowEx(NULL,
 		L"BelajarDirectX11",
 		L"Direct X 11 Learn",
 		WS_OVERLAPPEDWINDOW,
-		300,
-		300,
-		500,
-		300,
+		100,
+		100,
+		wr.right - wr.left,
+		wr.bottom - wr.top,
 		NULL,
 		NULL,
 		hInstance,
@@ -70,15 +89,72 @@ int WINAPI WinMain( HINSTANCE hInstance,
 	//Tampilkan window.
 	ShowWindow(hWnd, cmdShow);
 
+	//initialisasi D3D
+	InitD3D(hWnd);
+
 	//Object pesan / MSG
 	MSG msg;
-
-	while (GetMessage(&msg, NULL, 0, 0))
+	while (TRUE)
 	{
-		TranslateMessage(&msg);
-		DispatchMessage(&msg);
+		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+		{
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+			if (msg.message == WM_QUIT)
+			{
+				break;
+			}
+			else
+			{
+				//Game code disini.
+			}
+		}
 	}
 
+	//bersihin D3D dan COM
+	CleanD3D();
+
 	return msg.wParam;
+}
+
+//function untuk initialisasi Direct3D
+void InitD3D(HWND hWnd)
+{
+	//membuat struct untuk menyimpan informasi swap chain
+	DXGI_SWAP_CHAIN_DESC scd;
+
+	//bersihin memory.
+	ZeroMemory(&scd, sizeof(DXGI_SWAP_CHAIN_DESC));
+
+	//isi swap chain description struct.
+	scd.BufferCount = 1;								//satu back buffer.
+	scd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; //pakai 32-bit color.
+	scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;  //bagaimana pemakaian swap chain.
+	scd.OutputWindow = hWnd;							//window yang akan dipakai.
+	scd.SampleDesc.Count = 4;							//berapa banyak multisample.
+	scd.Windowed = TRUE;								//windowed / fullscreen
+
+	//buat device , device context dan swap chain dengan informasi yang ada di scd struct.
+	D3D11CreateDeviceAndSwapChain(
+		NULL,
+		D3D_DRIVER_TYPE_HARDWARE,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		D3D11_SDK_VERSION,
+		&scd,
+		&swapChain,
+		&dev,
+		NULL,
+		&devcon);
+}
+
+void CleanD3D()
+{
+	//tutup dan buang semua COM object yang ada.
+	swapChain->Release();
+	dev->Release();
+	devcon->Release();
 }
 
