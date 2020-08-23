@@ -10,37 +10,18 @@
 #pragma comment (lib, "d3dx11.lib")
 #pragma comment (lib, "d3dx10.lib")
 
-IDXGISwapChain* swapChain;			//pointer untuk swap chain interface
+IDXGISwapChain* swapchain;			//pointer untuk swap chain interface
 ID3D11Device* dev;					//pointer ke arah Direct3D device interface
 ID3D11DeviceContext* devcon;		//pointer ke arah Direct3D device context
+ID3D11RenderTargetView* backbuffer; //pointer ke arah backbuffer
 
 //function prototype
-void InitD3D(HWND hWnd);				//setting initialisasi dari direct3D
-void CleanD3D(void);				//tutup Direct3D dan bersihin memory
+void InitD3D(HWND hWnd);																//setting initialisasi dari direct3D
+void CleanD3D(void);																	//tutup Direct3D dan bersihin memory
+void RenderFrame(void);																	//render single frame
 
-//Ini adalah main handler untuk programnya.
-LRESULT CALLBACK WindowProc(HWND hWnd,
-							UINT message,
-							WPARAM wParam,
-							LPARAM lParam)
-{
-	//Check message nya berisi apa. Bila sudah di destroy maka kita return
-	//Bahwa program keluar dengan sempurna 0.
-	switch (message)
-	{
-		case WM_DESTROY:
-			{
-				PostQuitMessage(0);
-				return 0;
-			}
-		break;
-	}
-
-	//Pastikan tidak ada value yang terlewat.
-	//Dengan DefWindowProc, kita bisa menetralisir semua value yang
-	//terlewat dan diassign dengan 0.
-	return DefWindowProc(hWnd, message, wParam, lParam);
-}
+//WindowProc function prototype
+LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 // Entry point punya semua windows program.
 int WINAPI WinMain( HINSTANCE hInstance,
@@ -58,13 +39,13 @@ int WINAPI WinMain( HINSTANCE hInstance,
 	ZeroMemory(&wc, sizeof(WNDCLASSEX));
 
 	//Isi informasi window class.
-	wc.cbSize = sizeof(WNDCLASSEX); //Size dari window class.
-	wc.style = CS_HREDRAW | CS_VREDRAW; //Style dari window. berfungsi untuk menggambar ulang.
-	wc.lpfnWndProc = WindowProc; //Mendapatkan informasi dari process window.
-	wc.hInstance = hInstance; //Dapatkan instance dari window.
-	wc.hCursor = LoadCursor(NULL, IDC_ARROW); //Cursor yang akan di render di dalam window.
-	wc.hbrBackground = (HBRUSH)COLOR_WINDOW; //Gambar yang akan di 'brush' bila window digerakkan.
-	wc.lpszClassName = L"BelajarDirectX11"; //Class name dari window class.
+	wc.cbSize = sizeof(WNDCLASSEX);				//Size dari window class.
+	wc.style = CS_HREDRAW | CS_VREDRAW;			//Style dari window. berfungsi untuk menggambar ulang.
+	wc.lpfnWndProc = WindowProc;				//Mendapatkan informasi dari process window.
+	wc.hInstance = hInstance;					//Dapatkan instance dari window.
+	wc.hCursor = LoadCursor(NULL, IDC_ARROW);	//Cursor yang akan di render di dalam window.
+	wc.hbrBackground = (HBRUSH)COLOR_WINDOW;	//Gambar yang akan di 'brush' bila window digerakkan.
+	wc.lpszClassName = L"BelajarDirectX11";		//Class name dari window class.
 
 	//Register window class.
 	RegisterClassEx(&wc);
@@ -107,6 +88,7 @@ int WINAPI WinMain( HINSTANCE hInstance,
 			else
 			{
 				//Game code disini.
+				RenderFrame();
 			}
 		}
 	}
@@ -115,6 +97,42 @@ int WINAPI WinMain( HINSTANCE hInstance,
 	CleanD3D();
 
 	return msg.wParam;
+}
+
+//Ini adalah main handler untuk programnya.
+LRESULT CALLBACK WindowProc(HWND hWnd,
+	UINT message,
+	WPARAM wParam,
+	LPARAM lParam)
+{
+	//Check message nya berisi apa. Bila sudah di destroy maka kita return
+	//Bahwa program keluar dengan sempurna 0.
+	switch (message)
+	{
+	case WM_DESTROY:
+	{
+		PostQuitMessage(0);
+		return 0;
+	}
+	break;
+	}
+
+	//Pastikan tidak ada value yang terlewat.
+	//Dengan DefWindowProc, kita bisa menetralisir semua value yang
+	//terlewat dan diassign dengan 0.
+	return DefWindowProc(hWnd, message, wParam, lParam);
+}
+
+//fungsi untuk render single frame.
+void RenderFrame(void)
+{
+	//bersihin render buffer jadi warna
+	devcon->ClearRenderTargetView(backbuffer, D3DXCOLOR(0.0f, 0.2f, 0.5f, 1.0f));
+
+	//buat 3D rendering disini
+
+	//switch back buffer dengan front buffer
+	swapchain->Present(0, 0);
 }
 
 //function untuk initialisasi Direct3D
@@ -144,16 +162,39 @@ void InitD3D(HWND hWnd)
 		NULL,
 		D3D11_SDK_VERSION,
 		&scd,
-		&swapChain,
+		&swapchain,
 		&dev,
 		NULL,
 		&devcon);
+
+	//dapetin address dari backbuffer
+	ID3D11Texture2D* pBackBuffer;
+	swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
+
+	//pakai backbuffer address untuk membuat render target
+	dev->CreateRenderTargetView(pBackBuffer, NULL, &backbuffer);
+	pBackBuffer->Release();
+
+	//simpan render target di backbuffer
+	devcon->OMSetRenderTargets(1, &backbuffer, NULL);
+
+	//set viewport
+	D3D11_VIEWPORT viewport;
+	ZeroMemory(&viewport, sizeof(D3D11_VIEWPORT));
+
+	viewport.TopLeftX = 0;
+	viewport.TopLeftY = 0;
+	viewport.Height = 600;
+	viewport.Width = 800;
+
+	devcon->RSSetViewports(1, &viewport);
 }
 
 void CleanD3D()
 {
 	//tutup dan buang semua COM object yang ada.
-	swapChain->Release();
+	swapchain->Release();
+	backbuffer->Release();
 	dev->Release();
 	devcon->Release();
 }
