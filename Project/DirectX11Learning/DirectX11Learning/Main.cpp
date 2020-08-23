@@ -23,6 +23,9 @@ void RenderFrame(void);																	//render single frame
 //WindowProc function prototype
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
+UINT SCREEN_WIDTH = 800;
+UINT SCREEN_HEIGHT = 600;
+
 // Entry point punya semua windows program.
 int WINAPI WinMain( HINSTANCE hInstance,
 					HINSTANCE prevInstance,
@@ -44,7 +47,7 @@ int WINAPI WinMain( HINSTANCE hInstance,
 	wc.lpfnWndProc = WindowProc;				//Mendapatkan informasi dari process window.
 	wc.hInstance = hInstance;					//Dapatkan instance dari window.
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);	//Cursor yang akan di render di dalam window.
-	wc.hbrBackground = (HBRUSH)COLOR_WINDOW;	//Gambar yang akan di 'brush' bila window digerakkan.
+//	wc.hbrBackground = (HBRUSH)COLOR_WINDOW;	//Gambar yang akan di 'brush' bila window digerakkan.
 	wc.lpszClassName = L"BelajarDirectX11";		//Class name dari window class.
 
 	//Register window class.
@@ -58,10 +61,10 @@ int WINAPI WinMain( HINSTANCE hInstance,
 		L"BelajarDirectX11",
 		L"Direct X 11 Learn",
 		WS_OVERLAPPEDWINDOW,
-		100,
-		100,
-		wr.right - wr.left,
-		wr.bottom - wr.top,
+		300,
+		300,
+		SCREEN_WIDTH,
+		SCREEN_HEIGHT,
 		NULL,
 		NULL,
 		hInstance,
@@ -147,10 +150,13 @@ void InitD3D(HWND hWnd)
 	//isi swap chain description struct.
 	scd.BufferCount = 1;								//satu back buffer.
 	scd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; //pakai 32-bit color.
+	scd.BufferDesc.Width = SCREEN_WIDTH;				//set back buffer width.
+	scd.BufferDesc.Height = SCREEN_HEIGHT;				//set back buffer height.
 	scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;  //bagaimana pemakaian swap chain.
 	scd.OutputWindow = hWnd;							//window yang akan dipakai.
 	scd.SampleDesc.Count = 4;							//berapa banyak multisample.
-	scd.Windowed = TRUE;								//windowed / fullscreen
+	scd.Windowed = TRUE;								//windowed / fullscreen.
+	scd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH; //membolehkan full-screen switching.
 
 	//buat device , device context dan swap chain dengan informasi yang ada di scd struct.
 	D3D11CreateDeviceAndSwapChain(
@@ -184,14 +190,16 @@ void InitD3D(HWND hWnd)
 
 	viewport.TopLeftX = 0;
 	viewport.TopLeftY = 0;
-	viewport.Height = 600;
-	viewport.Width = 800;
+	viewport.Height = SCREEN_HEIGHT;
+	viewport.Width = SCREEN_WIDTH;
 
 	devcon->RSSetViewports(1, &viewport);
 }
 
 void CleanD3D()
 {
+	swapchain->SetFullscreenState(FALSE, NULL);
+
 	//tutup dan buang semua COM object yang ada.
 	swapchain->Release();
 	backbuffer->Release();
