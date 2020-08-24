@@ -14,17 +14,25 @@ IDXGISwapChain* swapchain;			//pointer untuk swap chain interface
 ID3D11Device* dev;					//pointer ke arah Direct3D device interface
 ID3D11DeviceContext* devcon;		//pointer ke arah Direct3D device context
 ID3D11RenderTargetView* backbuffer; //pointer ke arah backbuffer
+ID3D11InputLayout* inputLayout;		
+ID3D11VertexShader* VS;
+ID3D11PixelShader* PS;
+ID3D11Buffer* pVBuffer;
+
+struct VERTEX { FLOAT x, y, z; D3DXCOLOR Color; };
 
 //function prototype
 void InitD3D(HWND hWnd);																//setting initialisasi dari direct3D
 void CleanD3D(void);																	//tutup Direct3D dan bersihin memory
 void RenderFrame(void);																	//render single frame
+void InitGraphic(void);
+void InitPipeline(void);
 
 //WindowProc function prototype
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
-UINT SCREEN_WIDTH = 800;
-UINT SCREEN_HEIGHT = 600;
+FLOAT SCREEN_WIDTH = 800;
+FLOAT SCREEN_HEIGHT = 600;
 
 // Entry point punya semua windows program.
 int WINAPI WinMain( HINSTANCE hInstance,
@@ -48,7 +56,7 @@ int WINAPI WinMain( HINSTANCE hInstance,
 	wc.hInstance = hInstance;					//Dapatkan instance dari window.
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);	//Cursor yang akan di render di dalam window.
 //	wc.hbrBackground = (HBRUSH)COLOR_WINDOW;	//Gambar yang akan di 'brush' bila window digerakkan.
-	wc.lpszClassName = L"BelajarDirectX11";		//Class name dari window class.
+	wc.lpszClassName = TEXT("BelajarDirectX11");		//Class name dari window class.
 
 	//Register window class.
 	RegisterClassEx(&wc);
@@ -58,8 +66,8 @@ int WINAPI WinMain( HINSTANCE hInstance,
 
 	//Buat windows Extended.
 	hWnd = CreateWindowEx(NULL,
-		L"BelajarDirectX11",
-		L"Direct X 11 Learn",
+		TEXT("BelajarDirectX11"),
+		TEXT("Direct X 11 Learn"),
 		WS_OVERLAPPEDWINDOW,
 		300,
 		300,
@@ -78,18 +86,35 @@ int WINAPI WinMain( HINSTANCE hInstance,
 
 	//Object pesan / MSG
 	MSG msg;
+
+	//Window loop
 	while (TRUE)
 	{
+		//idk why but this linker doesn't work even i already check that user32.lib already exist.
+		//so for now, i'll just commenting this without blocking progress on the project.
+
+//		DWORD old = timeGetTime();
+//		DWORD delta, now = old;
+
 		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
 		{
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
+
+//			DWORD old = timeGetTime();
+//			delta = now - old;
+
+//			if (delta >= 1)
+//				break;
+
+			Sleep(1);
+
 			if (msg.message == WM_QUIT)
 			{
 				break;
 			}
 			else
-			{
+			{				
 				//Game code disini.
 				RenderFrame();
 			}
@@ -132,7 +157,16 @@ void RenderFrame(void)
 	//bersihin render buffer jadi warna
 	devcon->ClearRenderTargetView(backbuffer, D3DXCOLOR(0.0f, 0.2f, 0.5f, 1.0f));
 
-	//buat 3D rendering disini
+	//pilih vertex buffer yang ingin di display
+	UINT stride = sizeof(VERTEX);
+	UINT offset = 0;
+	devcon->IASetVertexBuffers(0, 1, &pVBuffer, &stride, &offset);
+
+	//set cara primitive topology
+	devcon->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	
+	//gambar segitiga
+	devcon->Draw(3, 0);
 
 	//switch back buffer dengan front buffer
 	swapchain->Present(0, 0);
@@ -194,6 +228,9 @@ void InitD3D(HWND hWnd)
 	viewport.Width = SCREEN_WIDTH;
 
 	devcon->RSSetViewports(1, &viewport);
+
+	InitPipeline();
+	InitGraphic();
 }
 
 void CleanD3D()
@@ -201,9 +238,77 @@ void CleanD3D()
 	swapchain->SetFullscreenState(FALSE, NULL);
 
 	//tutup dan buang semua COM object yang ada.
+	inputLayout->Release();
+	VS->Release();
+	PS->Release();
+	pVBuffer->Release();
 	swapchain->Release();
 	backbuffer->Release();
 	dev->Release();
 	devcon->Release();
+}
+
+void InitPipeline()
+{
+	//load dan compile dua shaders (vertex dan pixel)
+	ID3D10Blob* vs_buffer, * ps_buffer;
+	ID3D10Blob* vs_buffer_error, * ps_buffer_error;
+	D3DX11CompileFromFile(TEXT("shaders.shader"), 0, 0, "VShader", "vs_4_0", 0, 0, 0, &vs_buffer, &vs_buffer_error, 0);
+	D3DX11CompileFromFile(TEXT("shaders.shader"), 0, 0, "PShader", "ps_4_0", 0, 0, 0, &ps_buffer, &ps_buffer_error, 0);
+
+	//check jika ada error menggunakan ppErrorMsgs (dalam CompileFromFile)
+	if (vs_buffer_error != 0)
+	{
+		OutputDebugStringA((char*)vs_buffer_error->GetBufferPointer());
+	}
+
+	if (ps_buffer_error != 0)
+	{
+		OutputDebugStringA((char*)ps_buffer_error->GetBufferPointer());
+	}
+
+
+	//enkapsulasi kedua shader ke dalam shader objects
+	dev->CreateVertexShader(vs_buffer->GetBufferPointer(), vs_buffer->GetBufferSize(), NULL, &VS);
+	dev->CreatePixelShader(ps_buffer->GetBufferPointer(), ps_buffer->GetBufferSize(), NULL, &PS);
+
+	devcon->VSSetShader(VS, 0, 0);
+	devcon->PSSetShader(PS, 0, 0);
+
+	D3D11_INPUT_ELEMENT_DESC ied[] =
+	{
+		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
+	};
+
+	dev->CreateInputLayout(ied, 2, vs_buffer->GetBufferPointer(), vs_buffer->GetBufferSize(), &inputLayout);
+	devcon->IASetInputLayout(inputLayout);
+
+}
+
+void InitGraphic()
+{
+	VERTEX ourVertices[] =
+	{
+		{0.0f,0.5f, 0.0f, D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f) },
+		{0.45f,-0.5f, 0.0f, D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f) },
+		{-0.45f,-0.5f, 0.0f, D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f) }
+	};
+
+	D3D11_BUFFER_DESC bd;
+	ZeroMemory(&bd, sizeof(bd));
+
+	bd.Usage = D3D11_USAGE_DYNAMIC;				//tulis access untuk CPU dan GPU
+	bd.ByteWidth = sizeof(ourVertices);			//ukuran dari ourVertices
+	bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;	//digunakan untuk binding vertex buffer
+	bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE; //memberikan akses ke CPU untuk di write buffer
+
+	dev->CreateBuffer(&bd, NULL, &pVBuffer);	//buat buffer
+
+	//copy vertices ke buffer
+	D3D11_MAPPED_SUBRESOURCE ms;
+	devcon->Map(pVBuffer, NULL, D3D11_MAP_WRITE_DISCARD, NULL, &ms);
+	memcpy(ms.pData, ourVertices, sizeof(ourVertices));
+	devcon->Unmap(pVBuffer, NULL);
 }
 
